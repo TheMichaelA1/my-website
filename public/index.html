@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SMS Bomber - Массовая отправка SMS</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #2d3436;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 18px 30px;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+            width: 100%;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn.stop {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+        }
+
+        .btn:disabled {
+            background: #b2bec3;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+            min-height: 100px;
+        }
+
+        .status.success {
+            border-left: 4px solid #00b894;
+        }
+
+        .status.error {
+            border-left: 4px solid #d63031;
+        }
+
+        .status.info {
+            border-left: 4px solid #0984e3;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            color: #636e72;
+            font-size: 0.9em;
+        }
+
+        .services-list {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        .service-item {
+            display: inline-block;
+            background: #2196f3;
+            color: white;
+            padding: 5px 12px;
+            margin: 5px;
+            border-radius: 20px;
+            font-size: 0.9em;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 2s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+                border-radius: 15px;
+            }
+            
+            .header {
+                padding: 20px;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .content {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>💣 SMS Bomber</h1>
+            <p>Массовая отправка SMS сообщений</p>
+        </div>
+
+        <div class="content">
+            <div class="services-list" id="servicesList">
+                <strong>Доступные сервисы:</strong>
+                <div id="servicesContainer">Загрузка...</div>
+            </div>
+
+            <div class="form-group">
+                <label for="phone">Номер телефона:</label>
+                <input type="tel" id="phone" placeholder="79001234567 (11 цифр без +7)" required>
+            </div>
+
+            <div class="form-group">
+                <label for="duration">Время работы (минут):</label>
+                <select id="duration">
+                    <option value="5">5 минут</option>
+                    <option value="10" selected>10 минут</option>
+                    <option value="15">15 минут</option>
+                    <option value="30">30 минут</option>
+                    <option value="60">60 минут</option>
+                </select>
+            </div>
+
+            <button class="btn" id="actionBtn">🚀 Запустить Бомбер</button>
+
+            <div class="status info" id="status">
+                Готов к работе. Введите номер телефона и время работы.
+            </div>
+
+            <div class="stats" id="stats" style="display: none;">
+                <div class="stat-card">
+                    <div class="stat-number" id="sentCount">0</div>
+                    <div class="stat-label">Отправлено SMS</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="timeLeft">0</div>
+                    <div class="stat-label">Минут осталось</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class SMSBomber {
+            constructor() {
+                this.isRunning = false;
+                this.currentPhone = '';
+                this.statusInterval = null;
+                this.init();
+            }
+
+            async init() {
+                await this.loadServices();
+                this.setupEventListeners();
+            }
+
+            async loadServices() {
+                try {
+                    const response = await fetch('/api/services');
+                    const data = await response.json();
+                    
+                    const servicesContainer = document.getElementById('servicesContainer');
+                    servicesContainer.innerHTML = data.services.map(service => 
+                        `<span class="service-item">${service}</span>`
+                    ).join('');
+                } catch (error) {
+                    console.error('Error loading services:', error);
+                }
+            }
+
+            setupEventListeners() {
+                const actionBtn = document.getElementById('actionBtn');
+                actionBtn.addEventListener('click', () => {
+                    if (this.isRunning) {
+                        this.stopBombing();
+                    } else {
+                        this.startBombing();
+                    }
+                });
+            }
+
+            async startBombing() {
+                const phone = document.getElementById('phone').value;
+                const duration = document.getElementById('duration').value;
+
+                if (!this.validatePhone(phone)) {
+                    this.showStatus('Введите корректный номер телефона (11 цифр)', 'error');
+                    return;
+                }
+
+                this.currentPhone = phone;
+                this.showStatus('Запускаем бомбер...', 'info');
+                document.getElementById('actionBtn').disabled = true;
+                document.getElementById('actionBtn').textContent = '⏳ Запуск...';
+
+                try {
+                    const response = await fetch('/api/start-bombing', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            phone: phone,
+                            duration: parseInt(duration)
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        this.isRunning = true;
+                        document.getElementById('actionBtn').textContent = '🛑 Остановить Бомбер';
+                        document.getElementById('actionBtn').classList.add('stop');
+                        this.showStatus(data.message, 'success');
+                        document.getElementById('stats').style.display = 'grid';
+                        this.startStatusUpdates();
+                    } else {
+                        throw new Error(data.error);
+                    }
+                } catch (error) {
+                    this.showStatus(`Ошибка: ${error.message}`, 'error');
+                } finally {
+                    document.getElementById('actionBtn').disabled = false;
+                }
+            }
+
+            async stopBombing() {
+                this.showStatus('Останавливаем бомбер...', 'info');
+                document.getElementById('actionBtn').disabled = true;
+
+                try {
+                    const response = await fetch('/api/stop-bombing', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            phone: this.currentPhone
+                        })
+                    });
+
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        this.isRunning = false;
+                        this.showStatus(data.message, 'info');
+                        document.getElementById('stats').style.display = 'none';
+                        this.stopStatusUpdates();
+                    }
+                } catch (error) {
+                    this.showStatus(`Ошибка остановки: ${error.message}`, 'error');
+                } finally {
+                    this.resetUI();
+                }
+            }
+
+            async startStatusUpdates() {
+                this.statusInterval = setInterval(async () => {
+                    if (!this.isRunning) return;
+
+                    try {
+                        const response = await fetch(`/api/status/${this.currentPhone}`);
+                        const data = await response.json();
+
+                        if (data.active) {
+                            document.getElementById('sentCount').textContent = data.stats.sent;
+                            document.getElementById('timeLeft').textContent = data.timeLeft;
+                        } else {
+                            this.stopBombing();
+                        }
+                    } catch (error) {
+                        console.error('Status update error:', error);
+                    }
+                }, 5000);
+            }
+
+            stopStatusUpdates() {
+                if (this.statusInterval) {
+                    clearInterval(this.statusInterval);
+                    this.statusInterval = null;
+                }
+            }
+
+            resetUI() {
+                document.getElementById('actionBtn').textContent = '🚀 Запустить Бомбер';
+                document.getElementById('actionBtn').classList.remove('stop');
+                document.getElementById('actionBtn').disabled = false;
+                this.isRunning = false;
+            }
+
+            validatePhone(phone) {
+                return /^[0-9]{11}$/.test(phone);
+            }
+
+            showStatus(message, type) {
+                const statusEl = document.getElementById('status');
+                statusEl.textContent = message;
+                statusEl.className = `status ${type}`;
+            }
+        }
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', () => {
+            new SMSBomber();
+        });
+    </script>
+</body>
+</html>
