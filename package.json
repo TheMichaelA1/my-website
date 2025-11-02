@@ -1,0 +1,38 @@
+{
+  "name": "casino-1337win",
+  "version": "1.0.0",
+  "description": "Premium Casino Platform 1337Win",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "build": "npm install",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "casino",
+    "gambling",
+    "roulette",
+    "games"
+  ],
+  "author": "1337Win Team",
+  "license": "PROPRIETARY",
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.7.2",
+    "cors": "^2.8.5",
+    "body-parser": "^1.20.2",
+    "bcrypt": "^5.1.0",
+    "jsonwebtoken": "^9.0.0",
+    "mongoose": "^7.3.0",
+    "helmet": "^7.0.0",
+    "compression": "^1.7.4",
+    "express-rate-limit": "^6.8.1"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.22"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
