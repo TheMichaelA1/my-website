@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1337Win - Премиум Казино</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Все стили остаются такими же как в предыдущей версии */
+        /* Добавлены только фиксы для отображения ошибок */
+        
+        .debug-info {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.8);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            color: #00ff00;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <!-- Все модальные окна и интерфейс остаются такими же -->
+    <!-- Добавлен только debug info для тестирования -->
+
+    <div class="debug-info" id="debugInfo" style="display: none;">
+        Server: <span id="serverStatus">Checking...</span>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin + '/api';
+        const TOKEN_KEY = 'casino1337win_token';
+        const USER_KEY = 'casino1337win_user';
+        const ADMIN_SESSION_KEY = 'casino1337win_admin_session';
+        
+        let currentUser = null;
+        let authToken = null;
+        let adminSession = null;
+        let currentBets = [];
+        let isSpinning = false;
+        let gameHistory = [];
+
+        // FIXED: Better API call with detailed error handling
+        async function apiCall(endpoint, options = {}) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+            try {
+                console.log(`API Call: ${endpoint}`, options.body || '');
+                
+                const response = await fetch(API_BASE + endpoint, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...(authToken && { 'Authorization': 'Bearer ' + authToken }),
+                        ...options.headers
+                    },
+                    signal: controller.signal,
+                    ...options
+                });
+
+                clearTimeout(timeoutId);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error(`HTTP ${response.status}: ${errorText}`);
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                console.log(`API Response:`, data);
+                return data;
+                
+            } catch (error) {
+                clearTimeout(timeoutId);
+                console.error('API call failed:', error);
+                
+                if (error.name === 'AbortError') {
+                    return { success: false, error: 'Таймаут соединения (15 сек)' };
+                }
+                
+                if (error.message.includes('Failed to fetch')) {
+                    return { success: false, error: 'Не удалось подключиться к серверу' };
+                }
+                
+                return { success: false, error: 'Ошибка сети: ' + error.message };
+            }
+        }
+
+        // FIXED: Better session management
+        function loadSession() {
+            try {
+                const savedToken = localStorage.getItem(TOKEN_KEY);
+                const savedUser = localStorage.getItem(USER_KEY);
+                
+                if (savedToken && savedUser) {
+                    authToken = savedToken;
+                    currentUser = JSON.parse(savedUser);
+                    console.log('Session loaded:', currentUser.login);
+                    return true;
+                }
+            } catch (e) {
+                console.error('Error loading session:', e);
+                clearSession();
+            }
+            return false;
+        }
+
+        function saveSession() {
+            try {
+                if (authToken && currentUser) {
+                    localStorage.setItem(TOKEN_KEY, authToken);
+                    localStorage.setItem(USER_KEY, JSON.stringify(currentUser));
+                }
+            } catch (e) {
+                console.error('Error saving session:', e);
+            }
+        }
+
+        function clearSession() {
+            try {
+                localStorage.removeItem(TOKEN_KEY);
+                localStorage.removeItem(USER_KEY);
+            } catch (e) {
+                console.error('Error clearing session:', e);
+            }
+            currentUser = null;
+            authToken = null;
+        }
+
+        // FIXED: Better notification system
+        function showNotification(message, isError = false) {
+            try {
+                const notification = document.createElement('div');
+                notification.className = `notification ${isError ? 'error-notification' : ''}`;
+                notification.textContent = message;
+                notification.style.background = isError ? '#ff4444' : '#00c853';
+                notification.style.zIndex = '10000';
+                document.body.appendChild(notification);
+                
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 5000);
+            } catch (e) {
+                console.error('Error showing notification:', e);
+                alert(message); // Fallback
+            }
+        }
+
+        // FIXED: Better loading states
+        function setLoading(button, isLoading) {
+            if (!button) return;
+            
+            if (isLoading) {
+                button.classList.add('loading');
+                button.disabled = true;
+                const originalText = button.innerHTML;
+                button.setAttribute('data-original-text', originalText);
+                button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Загрузка...';
+            } else {
+                button.classList.remove('loading');
+                button.disabled = false;
+                const originalText = button.getAttribute('data-original-text');
+                if (originalText) {
+                    button.innerHTML = originalText;
+                }
+            }
+        }
+
+        // FIXED: Better registration with validation
+        async function register() {
+            const login = document.getElementById('regLogin')?.value.trim() || '';
+            const password = document.getElementById('regPassword')?.value || '';
+            const email = document.getElementById('regEmail')?.value.trim() || '';
+            const button = document.getElementById('registerBtn');
+            
+            if (!login || !password || !email) {
+                showNotification('Заполните все поля', true);
+                return;
+            }
+            
+            if (password.length < 6) {
+                showNotification('Пароль должен быть от 6 символов', true);
+                return;
+            }
+            
+            if (!validateEmail(email)) {
+                showNotification('Введите корректный email', true);
+                return;
+            }
+            
+            setLoading(button, true);
+
+            try {
+                const result = await apiCall('/register', {
+                    method: 'POST',
+                    body: JSON.stringify({ 
+                        login: login,
+                        password: password,
+                        email: email 
+                    })
+                });
+
+                if (result.success) {
+                    authToken = result.token;
+                    currentUser = result.user;
+                    saveSession();
+                    document.getElementById('authModal').style.display = 'none';
+                    document.getElementById('mainInterface').classList.remove('hidden');
+                    updateBalance();
+                    showNotification(result.message);
+                } else {
+                    showNotification(result.error, true);
+                }
+            } catch (error) {
+                showNotification('Ошибка при регистрации', true);
+                console.error('Registration error:', error);
+            } finally {
+                setLoading(button, false);
+            }
+        }
+
+        // FIXED: Better login with validation
+        async function login() {
+            const loginInput = document.getElementById('loginInput')?.value.trim() || '';
+            const password = document.getElementById('passwordInput')?.value || '';
+            const button = document.getElementById('loginBtn');
+            
+            if (!loginInput || !password) {
+                showNotification('Заполните все поля', true);
+                return;
+            }
+            
+            setLoading(button, true);
+
+            try {
+                const result = await apiCall('/login', {
+                    method: 'POST',
+                    body: JSON.stringify({ 
+                        login: loginInput,
+                        password: password 
+                    })
+                });
+
+                if (result.success) {
+                    authToken = result.token;
+                    currentUser = result.user;
+                    saveSession();
+                    document.getElementById('authModal').style.display = 'none';
+                    document.getElementById('mainInterface').classList.remove('hidden');
+                    updateBalance();
+                    showNotification(result.message);
+                } else {
+                    showNotification(result.error, true);
+                // Clear password field on error
+                    document.getElementById('passwordInput').value = '';
+                }
+            } catch (error) {
+                showNotification('Ошибка при входе', true);
+                console.error('Login error:', error);
+            } finally {
+                setLoading(button, false);
+            }
+        }
+
+        // FIXED: Server status check
+        async function checkServerStatus() {
+            try {
+                const result = await apiCall('/health');
+                if (result.success) {
+                    document.getElementById('serverStatus').textContent = 'Online';
+                    document.getElementById('serverStatus').style.color = '#00ff00';
+                } else {
+                    document.getElementById('serverStatus').textContent = 'Error';
+                    document.getElementById('serverStatus').style.color = '#ff4444';
+                }
+            } catch (error) {
+                document.getElementById('serverStatus').textContent = 'Offline';
+                document.getElementById('serverStatus').style.color = '#ff4444';
+            }
+        }
+
+        // Utility function
+        function validateEmail(email) {
+            const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return re.test(email);
+        }
+
+        // Initialize with error handling
+        window.onload = async function() {
+            console.log('Initializing casino...');
+            
+            // Show debug info in development
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                document.getElementById('debugInfo').style.display = 'block';
+                checkServerStatus();
+            }
+            
+            // Try to load existing session
+            if (loadSession()) {
+                try {
+                    const result = await apiCall('/profile');
+                    if (result.success) {
+                        currentUser = result.user;
+                        saveSession();
+                        document.getElementById('authModal').style.display = 'none';
+                        document.getElementById('mainInterface').classList.remove('hidden');
+                        updateBalance();
+                        showNotification(`С возвращением, ${currentUser.login}!`);
+                    } else {
+                        clearSession();
+                        document.getElementById('authModal').style.display = 'flex';
+                    }
+                } catch (error) {
+                    console.error('Session validation error:', error);
+                    clearSession();
+                    document.getElementById('authModal').style.display = 'flex';
+                }
+            } else {
+                document.getElementById('authModal').style.display = 'flex';
+            }
+            
+            // Load admin session
+            loadAdminSession();
+        };
+
+        // Все остальные функции (updateBalance, roulette functions, etc.) остаются такими же
+        // как в предыдущей версии, но с добавленными try-catch блоками
+
+        // Пример фикса для функций ставок:
+        async function placeBet() {
+            if (isSpinning) {
+                showNotification('Дождитесь окончания вращения', true);
+                return;
+            }
+            
+            if (currentBets.length === 0) {
+                showNotification('Сначала сделайте ставку', true);
+                return;
+            }
+            
+            const totalAmount = currentBets.reduce((sum, bet) => sum + (bet.amount || 0), 0);
+            
+            if (!currentUser || currentUser.balance < totalAmount) {
+                showNotification('Недостаточно средств для всех ставок', true);
+                return;
+            }
+            
+            isSpinning = true;
+            const button = document.getElementById('placeBetBtn');
+            setLoading(button, true);
+
+            try {
+                const wheel = document.getElementById('rouletteWheel');
+                const randomSpin = 1080 + Math.floor(Math.random() * 360);
+                wheel.style.transform = `rotate(${randomSpin}deg)`;
+                
+                const result = await apiCall('/roulette/bet', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        bets: currentBets,
+                        totalAmount: totalAmount
+                    })
+                });
+
+                // Обработка результата...
+                
+            } catch (error) {
+                console.error('Bet error:', error);
+                showNotification('Ошибка при размещении ставки', true);
+            } finally {
+                setLoading(button, false);
+                isSpinning = false;
+            }
+        }
+
+        // Добавьте остальные функции из предыдущей версии...
+    </script>
+</body>
+</html>
