@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Бомбер</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 28px;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: bold;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            box-sizing: border-box;
+            transition: border-color 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #764ba2;
+        }
+
+        button {
+            background: #764ba2;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: bold;
+            width: 100%;
+            transition: background 0.3s, transform 0.2s;
+        }
+
+        button:hover {
+            background: #667eea;
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button.stop {
+            background: #dc3545;
+        }
+
+        button.stop:hover {
+            background: #c82333;
+        }
+
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            background: #f8f9fa;
+            color: #333;
+            font-weight: bold;
+            min-height: 80px;
+        }
+
+        .stats {
+            margin-top: 15px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .progress {
+            margin-top: 10px;
+            background: #e9ecef;
+            border-radius: 10px;
+            height: 10px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: #28a745;
+            transition: width 0.3s;
+        }
+
+        .log {
+            margin-top: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+            text-align: left;
+            font-size: 12px;
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Бомбер</h1>
+        <div class="input-group">
+            <label for="phone">Номер телефона:</label>
+            <input type="tel" id="phone" placeholder="+79991234567" required>
+        </div>
+        <div class="input-group">
+            <label for="minutes">Минут работы:</label>
+            <input type="number" id="minutes" placeholder="Введите количество минут" min="1" max="120" required>
+        </div>
+        <button id="actionButton">Запустить бомбер</button>
+        
+        <div class="progress">
+            <div id="progressBar" class="progress-bar" style="width: 0%"></div>
+        </div>
+        
+        <div id="status" class="status">Готов к работе. Введите номер и время.</div>
+        <div id="stats" class="stats"></div>
+        <div id="log" class="log"></div>
+    </div>
+
+    <script>
+        let isRunning = false;
+        let startTime = 0;
+        let totalTime = 0;
+
+        function addLog(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const color = type === 'error' ? 'red' : type === 'success' ? 'green' : 'blue';
+            logDiv.innerHTML += `<div style="color: ${color}">[${timestamp}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        document.getElementById('actionButton').addEventListener('click', async function() {
+            const phone = document.getElementById('phone').value;
+            const minutes = document.getElementById('minutes').value;
+            const statusDiv = document.getElementById('status');
+            const statsDiv = document.getElementById('stats');
+            const progressBar = document.getElementById('progressBar');
+            const button = this;
+
+            if (!phone || !minutes) {
+                statusDiv.textContent = 'Ошибка: Заполните все поля!';
+                statusDiv.style.color = 'red';
+                return;
+            }
+
+            if (!isRunning) {
+                // Запуск бомбера
+                button.textContent = 'Остановить бомбер';
+                button.classList.add('stop');
+                statusDiv.textContent = `Запуск бомбера на номер ${phone}...`;
+                statusDiv.style.color = 'green';
+                isRunning = true;
+                startTime = Date.now();
+                totalTime = minutes * 60 * 1000;
+
+                addLog(`🚀 Запуск бомбера на номер ${phone} на ${minutes} минут`);
+
+                try {
+                    const response = await fetch('/start-bomber', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ phone, minutes: parseInt(minutes) })
+                    });
+
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        statusDiv.innerHTML = `✅ Бомбер запущен!<br>Номер: ${phone}<br>Время: ${minutes} мин<br>Сервисов: ${result.totalServices}`;
+                        statsDiv.textContent = `Интервал: ${result.interval} | Примерно сообщений: ${result.estimatedMessages}`;
+                        
+                        // Прогресс бар
+                        const updateProgress = () => {
+                            if (!isRunning) return;
+                            
+                            const elapsed = Date.now() - startTime;
+                            const progress = Math.min((elapsed / totalTime) * 100, 100);
+                            progressBar.style.width = progress + '%';
+                            
+                            const timeLeft = Math.max(0, totalTime - elapsed);
+                            const minsLeft = Math.floor(timeLeft / 60000);
+                            const secsLeft = Math.floor((timeLeft % 60000) / 1000);
+                            
+                            statsDiv.textContent = `Осталось: ${minsLeft}:${secsLeft < 10 ? '0' : ''}${secsLeft} | Интервал: ${result.interval}`;
+                            
+                            if (timeLeft > 0) {
+                                setTimeout(updateProgress, 1000);
+                            } else {
+                                statusDiv.textContent = 'Рассылка завершена';
+                                statusDiv.style.color = 'blue';
+                                button.textContent = 'Запустить бомбер';
+                                button.classList.remove('stop');
+                                isRunning = false;
+                            }
+                        };
+                        
+                        updateProgress();
+                        addLog('Бомбер успешно запущен и работает', 'success');
+
+                    } else {
+                        throw new Error(result.error);
+                    }
+
+                } catch (error) {
+                    statusDiv.textContent = `Ошибка: ${error.message}`;
+                    statusDiv.style.color = 'red';
+                    button.textContent = 'Запустить бомбер';
+                    button.classList.remove('stop');
+                    isRunning = false;
+                    addLog(`Ошибка запуска: ${error.message}`, 'error');
+                }
+
+            } else {
+                // Остановка бомбера
+                button.disabled = true;
+                statusDiv.textContent = 'Останавливаем бомбер...';
+                addLog('🛑 Запрос на остановку бомбера...');
+                
+                try {
+                    const response = await fetch('/stop-bomber', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        }
+                    });
+                    
+                    const result = await response.json();
+                    
+                    statusDiv.textContent = result.message;
+                    statusDiv.style.color = 'orange';
+                    progressBar.style.width = '0%';
+                    
+                } catch (error) {
+                    statusDiv.textContent = `Ошибка при остановке: ${error.message}`;
+                    statusDiv.style.color = 'red';
+                }
+                
+                button.textContent = 'Запустить бомбер';
+                button.classList.remove('stop');
+                button.disabled = false;
+                isRunning = false;
+                statsDiv.textContent = '';
+                addLog('Бомбер остановлен', 'info');
+            }
+        });
+    </script>
+</body>
+</html>
