@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Бомбер</title>
+    <style>
+        body { font-family: Arial; background: #1a1a1a; color: white; margin: 0; padding: 20px; }
+        .container { max-width: 500px; margin: 50px auto; background: #2d2d2d; padding: 30px; border-radius: 10px; }
+        h1 { text-align: center; color: #ff4444; }
+        .input-group { margin: 20px 0; }
+        input { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #444; background: #1a1a1a; color: white; border-radius: 5px; }
+        button { width: 100%; padding: 15px; background: #ff4444; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; }
+        button:disabled { background: #666; cursor: not-allowed; }
+        .status { margin: 20px 0; padding: 15px; border-radius: 5px; background: #333; }
+        .success { color: #4CAF50; }
+        .error { color: #ff4444; }
+        .info { color: #2196F3; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>💣 SMS Бомбер</h1>
+        <div class="input-group">
+            <input type="tel" id="phone" placeholder="Номер телефона (79991234567)" required>
+        </div>
+        <div class="input-group">
+            <input type="number" id="minutes" placeholder="Минут работы" min="1" max="60" required>
+        </div>
+        <button id="actionButton">🚀 Запустить бомбер</button>
+        <div id="status" class="status">Готов к работе. 15 сервисов доступно.</div>
+    </div>
+
+    <script>
+        document.getElementById('actionButton').addEventListener('click', async function() {
+            const phone = document.getElementById('phone').value;
+            const minutes = document.getElementById('minutes').value;
+            const statusDiv = document.getElementById('status');
+            const button = this;
+
+            if (!phone || !minutes) {
+                statusDiv.innerHTML = '<span class="error">Заполните все поля!</span>';
+                return;
+            }
+
+            if (button.textContent === '🚀 Запустить бомбер') {
+                button.textContent = '🛑 Останавливаем...';
+                button.disabled = true;
+                statusDiv.innerHTML = '<span class="info">Запускаем бомбер...</span>';
+
+                try {
+                    const response = await fetch('/start-bomber', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ phone, minutes })
+                    });
+
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        button.textContent = '🛑 Остановить бомбер';
+                        button.disabled = false;
+                        statusDiv.innerHTML = `<span class="success">${result.message}</span><br>
+                                              <small>Сервисов: ${result.totalServices} | Интервал: ${result.interval}</small>`;
+                    } else {
+                        throw new Error(result.error);
+                    }
+
+                } catch (error) {
+                    statusDiv.innerHTML = `<span class="error">Ошибка: ${error.message}</span>`;
+                    button.textContent = '🚀 Запустить бомбер';
+                    button.disabled = false;
+                }
+
+            } else {
+                button.textContent = '🛑 Останавливаем...';
+                button.disabled = true;
+
+                try {
+                    await fetch('/stop-bomber', { method: 'POST' });
+                    statusDiv.innerHTML = '<span class="info">Бомбер остановлен</span>';
+                } catch (error) {
+                    statusDiv.innerHTML = `<span class="error">Ошибка остановки: ${error.message}</span>`;
+                }
+                
+                button.textContent = '🚀 Запустить бомбер';
+                button.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>
